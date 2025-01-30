@@ -76,7 +76,8 @@ class Login(commands.Cog):
             info = {
                 'emailAdress': emailaddress,
                 'dcUserId': interaction.user.id,
-                'tokenInfo': json.loads(self.creds.to_json())
+                'tokenInfo': json.loads(self.creds.to_json()),
+                'isActive': False
             }
             
             athInfo.insert_one(info)

@@ -12,6 +12,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 CLIENT = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
 mydb = CLIENT['authoriszations']
 idInfo = mydb.documentId
+athInfo = mydb.authInformation
 
 class AddDocument(commands.Cog):
     def __init__(self, bot):
@@ -20,6 +21,67 @@ class AddDocument(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print("ready to create document/files")
+        
+    @app_commands.command(name="activate", description="tell the bot which account you are using")
+    async def active(self, interaction: discord.Interaction, email: str):
+        athInfo.create_index([("emailAdress", 1), ("dcUserId", 1)])
+        athInfo.create_index([("isActive", 1), ("dcUserId", 1)])
+
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(
+            f"Hi, {interaction.user.mention}, we are finding your email address",
+            ephemeral=True
+        )
+
+        if athInfo.count_documents({
+            "$and": [
+                {"emailAdress": email},
+                {"dcUserId": interaction.user.id}
+            ]
+        }) != 0:
+            email = athInfo.find_one({
+                "isActive": True,
+                "dcUserId": interaction.user.id
+            }, {
+                "_id":0,
+                "emailAdress": 1
+            })
+    
+            if email:
+                await interaction.followup.send(
+                    f"Hi, {interaction.user.mention}, it seems like one of your account: {email}, is active right now. If it's not the acount you want to use you can use /end to deactivate it."
+                )
+            else:
+                athInfo.update_one(
+                    {"emailAdress": email, "dcUserId": interaction.user.id},
+                    {"$set": {"isActive": True}}
+                )
+
+                await interaction.followup.send(
+                    f"Hi, {interaction.user.mention}, you can now edit/add file/folder!",
+                    ephemeral=True
+                )
+        else:
+            await interaction.followup.send(
+                f"Hi, {interaction.user.mention}, we couldn't find your email address. Please check if the email address is correct, or use /login command",
+                ephemeral=True
+            )
+        
+        athInfo.drop_indexes()
+
+    @app_commands.command(name="end", description="tell the bot which account you want to end")
+    async def deActive(self, interaction: discord.Interaction, email: str):
+        continue
+    
+    @app_commands.command(name="createFile", description="create a file")
+    async def fileCreate(self, interaction: discord.Interaction):
+        continue
+
+    @app_commands.command(name="createFolder", description="create a folder")
+    async def folderCreate(self, interaction: discord.Interaction):
+        continue
+    
+        
     
 async def setup(bot):
     await bot.add_cog(AddDocument(bot))

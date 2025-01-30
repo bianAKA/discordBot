@@ -4,7 +4,6 @@ from discord import app_commands
 from datetime import datetime, timezone
 import json
 import pymongo
-
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -16,7 +15,7 @@ CLIENT = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
 mydb = CLIENT['authoriszations']
 athInfo = mydb.authInformation
 
-class Write(commands.Cog):
+class Login(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.creds = None
@@ -83,4 +82,4 @@ class Write(commands.Cog):
             athInfo.insert_one(info)
                 
 async def setup(bot):
-    await bot.add_cog(Write(bot))
+    await bot.add_cog(Login(bot))

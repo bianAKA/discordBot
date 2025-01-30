@@ -1,8 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import os
-import os.path
+from datetime import datetime, timezone
 import json
 import pymongo
 
@@ -27,58 +26,61 @@ class Write(commands.Cog):
     async def on_ready(self):
         print("commands ready")
 
+    def isExpired(self, timeString):
+        timeStamp = datetime.fromisoformat(timeString.replace('Z', '+00:00'))
+        currentTime = datetime.now(timeStamp.tzinfo)
+        return currentTime > timeStamp
+
     @app_commands.command(name="login", description="get token of google account")
     async def getCreds(self, interaction: discord.Interaction, emailaddress: str):
+        tokenExpired = False
         if athInfo.count_documents({
             "$and": [
                 {"emailAdress": emailaddress},
-                {"dcUserId": interaction.user.id},
-                {"isAuthorized": True}
+                {"dcUserId": interaction.user.id}
             ]
         }) != 0:
-            await interaction.response.send_message(f"Hi, {interaction.user.mention}, we already got your token", ephemeral=True)
+            tokenInfo = athInfo.find_one({'emailAdress': emailaddress, 'dcUserId': interaction.user.id}, {'_id':0, 'tokenInfo':1})['tokenInfo']
             
-            tokenInfo = athInfo.find({'emailAdress': emailaddress, 'dcUserId': interaction.user.id}, {_id:False, 'token':True})['token']
-            self.creds = Credentials.from_authorized_user_file(tokenInfo, SCOPES)
-            return
+            if not self.isExpired(tokenInfo['expiry']):
+                await interaction.response.send_message(f"Hi, {interaction.user.mention}, we already got your token", ephemeral=True)
+                return
+                #self.creds = Credentials.from_authorized_user_file(tokenInfo, SCOPES)
+            tokenExpired = True
+            
+        # 1. token is expired - need to get a new one
+        # 2. gmail hasn't been authorized
         
-        if not self.creds or not self.creds.valid:
-            rewritedCreds = False
-            if self.creds and self.creds.expired and self.creds.refresh_token:
-                self.creds.refresh(Request())
-                rewritedCreds = True
-            else: 
-                await interaction.response.defer(ephemeral=True)
-                await interaction.followup.send(
-                    f"Hi, {interaction.user.mention}, starting authentication process...",
-                    ephemeral=True
-                )
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(
+            f"Hi, {interaction.user.mention}, starting authentication process...",
+            ephemeral=True
+        )
 
-                self.flow = InstalledAppFlow.from_client_secrets_file(
-                    "./credentials.json", SCOPES
-                )
+        self.flow = InstalledAppFlow.from_client_secrets_file(
+            "./credentials.json", SCOPES
+        )
 
-                self.creds = self.flow.run_local_server(port=0)
-                
-                await interaction.followup.send(
-                    f"Authentication successful! Credentials saved. We got your token!!!!",
-                    ephemeral=True
-                )
-            
-            if rewritedCreds:
-                athInfo.update_one(
+        self.creds = self.flow.run_local_server(port=0)
+        
+        await interaction.followup.send(
+            f"Authentication successful! Credentials saved. We got your token!!!!",
+            ephemeral=True
+        )
+
+        if tokenExpired:
+            athInfo.update_one(
                     {"emailAdress": emailaddress, "dcUserId": interaction.user.id},
                     {"$set": {"token": self.creds.to_json()}}
-                )
-            else:
-                info = {
-                    'emailAdress': emailaddress,
-                    'dcUserId': interaction.user.id,
-                    'token': json.loads(self.creds.to_json()),
-                    'isAuthorized': True
-                }
-                
-                athInfo.insert_one(info)
+            )
+        else:
+            info = {
+                'emailAdress': emailaddress,
+                'dcUserId': interaction.user.id,
+                'tokenInfo': json.loads(self.creds.to_json())
+            }
+            
+            athInfo.insert_one(info)
                 
 async def setup(bot):
     await bot.add_cog(Write(bot))

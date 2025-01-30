@@ -39,7 +39,7 @@ class AddDocument(commands.Cog):
                 {"dcUserId": interaction.user.id}
             ]
         }) != 0:
-            email = athInfo.find_one({
+            emailTarget = athInfo.find_one({
                 "isActive": True,
                 "dcUserId": interaction.user.id
             }, {
@@ -47,7 +47,7 @@ class AddDocument(commands.Cog):
                 "emailAdress": 1
             })
     
-            if email:
+            if emailTarget:
                 await interaction.followup.send(
                     f"Hi, {interaction.user.mention}, it seems like one of your account: {email}, is active right now. If it's not the acount you want to use you can use /end to deactivate it."
                 )
@@ -71,17 +71,15 @@ class AddDocument(commands.Cog):
 
     @app_commands.command(name="end", description="tell the bot which account you want to end")
     async def deActive(self, interaction: discord.Interaction, email: str):
-        continue
+        return
     
-    @app_commands.command(name="createFile", description="create a file")
+    @app_commands.command(name="create_file", description="create a file")
     async def fileCreate(self, interaction: discord.Interaction):
-        continue
+        return
 
-    @app_commands.command(name="createFolder", description="create a folder")
+    @app_commands.command(name="create_folder", description="create a folder")
     async def folderCreate(self, interaction: discord.Interaction):
-        continue
-    
-        
+        return
     
 async def setup(bot):
     await bot.add_cog(AddDocument(bot))

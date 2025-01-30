@@ -30,7 +30,7 @@ class AddDocument(commands.Cog):
             ]
         }) != 0
         
-    async def updateActive(self, plsActive):
+    async def updateActive(self, plsActive, interaction: discord.Interaction, email):
         athInfo.update_one(
             {"emailAdress": email, "dcUserId": interaction.user.id},
             {"$set": {"isActive": plsActive}}
@@ -69,7 +69,7 @@ class AddDocument(commands.Cog):
                     f"Hi, {interaction.user.mention}, it seems like one of your account: {email}, is active right now. If it's not the acount you want to use you can use /end to deactivate it."
                 )
             else:
-                self.updateActive(True)
+                await self.updateActive(True, interaction, email)
         else:
             await interaction.followup.send(
                 f"Hi, {interaction.user.mention}, we couldn't find your email address. Please check if the email address is correct, or use /login command",
@@ -99,7 +99,7 @@ class AddDocument(commands.Cog):
             })
     
             if emailTarget:
-                self.updateActive(False)
+                await self.updateActive(False, interaction, email)
             else:
                 await interaction.followup.send(
                     f"Hi, {interaction.user.mention}, it seems like one of your account: {email}, is deactive right now."
@@ -118,6 +118,14 @@ class AddDocument(commands.Cog):
 
     @app_commands.command(name="create_folder", description="create a folder")
     async def folderCreate(self, interaction: discord.Interaction):
+        return
+    
+    @app_commands.command(name="delete_file", description="delete a file")
+    async def fileDelete(self, interaction: discord.Interaction):
+        return
+
+    @app_commands.command(name="delete_folder", description="delete a folder")
+    async def folderDelete(self, interaction: discord.Interaction):
         return
     
 async def setup(bot):

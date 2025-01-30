@@ -71,7 +71,7 @@ class Write(commands.Cog):
         if tokenExpired:
             athInfo.update_one(
                     {"emailAdress": emailaddress, "dcUserId": interaction.user.id},
-                    {"$set": {"token": self.creds.to_json()}}
+                    {"$set": {"token": json.loads(self.creds.to_json())}}
             )
         else:
             info = {

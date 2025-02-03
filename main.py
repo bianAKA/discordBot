@@ -3,6 +3,12 @@ from discord.ext import commands, tasks
 import os
 import asyncio
 from dotenv import load_dotenv
+import pymongo
+from datetime import datetime, timezone
+
+CLIENT = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
+mydb = CLIENT['authoriszations']
+athInfo = mydb.authInformation
 
 load_dotenv(".env")
 TOKEN: str = os.getenv("TOKEN")
@@ -24,9 +30,26 @@ async def load():
         if filename.endswith(".py"):
             await bot.load_extension(f"cogs.{filename[:-3]}")
 
+async def monitorExpired():
+    while True:
+        currTime = datetime.now(timezone.utc)
+        expired = list(athInfo.find(
+            {'expiryTime': {'$lt': currTime}},
+            {'emailAdress':1}
+        ))
+
+        for doc in expired:
+            athInfo.delete_one({'_id': doc['_id']})
+           
+        await asyncio.sleep(1) 
+
 async def main():
+    athInfo.create_index([("expiryTime", 1)], expireAfterSeconds=0)
+
     async with bot:
+        asyncio.create_task(monitorExpired())
         await load()
         await bot.start(TOKEN) 
+    athInfo.drop_indexes()
 
 asyncio.run(main())

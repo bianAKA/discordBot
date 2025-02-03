@@ -1,6 +1,9 @@
 # discordBot
 A discordBot that can write bullet points in a google doc by using python and mongodb
 
+async def monitorExpired():
+when the bot is running, we check if the user session ends or not.
+
 /login: authorise discord bot to have the permission to access
 - mongodb allows a discord user to have multiple email addresses authroised
 - mongodb avoids the multiple of token json files

@@ -77,6 +77,7 @@ class Login(commands.Cog):
                 'emailAdress': emailaddress,
                 'dcUserId': interaction.user.id,
                 'tokenInfo': json.loads(self.creds.to_json()),
+                'expiryTime': datetime.fromisoformat(json.loads(self.creds.to_json())['expiry'].replace('Z', '+00:00')),
                 'isActive': False
             }
             

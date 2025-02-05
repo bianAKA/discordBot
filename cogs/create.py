@@ -7,6 +7,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
+from typing import Optional
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 CLIENT = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
@@ -44,6 +45,29 @@ class AddDocument(commands.Cog):
         
         await interaction.followup.send(text, ephemeral=True)
         
+    def getEmail(self, interaction: discord.Interaction):        
+        token = athInfo.find_one(
+            {"dcUserId": interaction.user.id, "isActive": True},
+            {"emailAdress": 1}
+        )
+        
+        return token["emailAdress"]
+
+    async def getCred(self, interaction: discord.Interaction):
+        token = athInfo.find_one(
+            {"dcUserId": interaction.user.id, "isActive": True},
+            {"tokenInfo": 1}
+        )
+       
+        if token is None:
+            await interaction.response.send_message(
+                f"Hi, {interaction.user.mention}, your authorization of the email is either expired or is not valid. Please login and active it again"
+            )
+            
+            return None
+        
+        return Credentials.from_authorized_user_info(token["tokenInfo"], SCOPES)      
+    
     @app_commands.command(name="activate", description="tell the bot which account you are using")
     async def active(self, interaction: discord.Interaction, email: str):
         athInfo.create_index([("emailAdress", 1), ("dcUserId", 1)])
@@ -112,9 +136,48 @@ class AddDocument(commands.Cog):
         
         athInfo.drop_indexes()
     
-    @app_commands.command(name="create_file", description="create a file")
-    async def fileCreate(self, interaction: discord.Interaction):
-        return
+    def createMetaData_File(self, fileName: str, folderId: Optional[int] = None):
+        if folderId is None:
+            return {
+                'name': fileName,
+                'mimeType': 'application/vnd.google-apps.document'
+            }
+        else:
+            return {
+                'name': fileName,
+                'parents': [folderId],
+                'mimeType': 'application/vnd.google-apps.document'
+            }
+    
+    @app_commands.command(name="createfile", description="create a file")
+    async def fileCreate(self, interaction: discord.Interaction, file_name: str, folder_id: Optional[int] = None):
+        await interaction.response.defer(ephemeral=True)
+        creds = await self.getCred(interaction)
+    
+        if creds is None:
+            await interaction.followup.send(
+                f"Hi, {interaction.user.mention}, please make sure your email address has a valid authorization",
+                ephemeral=True
+            )
+            
+            return
+            
+        drive_service = build('drive', 'v3', credentials=creds)
+        doc = drive_service.files().create(body=self.createMetaData_File(file_name, folder_id)).execute()
+
+        info = {
+            'isFile': True,
+            'dcUserId': interaction.user.id,
+            'emailAdress': self.getEmail(interaction),
+            'id': doc['id']
+        }
+        
+        idInfo.insert_one(info)
+
+        await interaction.followup.send(
+                f"Hi, {interaction.user.mention}, file is created!",
+                ephemeral=True
+            )
 
     @app_commands.command(name="create_folder", description="create a folder")
     async def folderCreate(self, interaction: discord.Interaction):

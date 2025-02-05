@@ -16,6 +16,8 @@ when the bot is running, we check if the user session ends or not.
 - it checks if the email address is authorized or not
 - it checks that email address is deactivated or not. If it is activated, we will turn into deactivated
 
+/create_file: create a file, can put in a specific directory
+
 limitations: 
 1) (https://developers.google.com/docs/api/quickstart/python), the account needs to be added as a test user while configure the OAuth consent screen, otherwise it blocks the account.
 2) the URL for authorizing is opened locally

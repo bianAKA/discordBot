@@ -152,6 +152,22 @@ class AddDocument(commands.Cog):
         else:
             return idInfos['id']
     
+    async def getParentFolderN(self, name: str, interaction: discord.Interaction, isFile: bool):
+        drive_service = await self.getDriveService(interaction)
+        if drive_service is None:
+            return 'n/a'
+        
+        instance = drive_service.files().get(
+            fileId=self.getId(name, interaction, isFile),
+            fields='parents'
+        ).execute()
+        
+        if 'parents' in instance:
+            return drive_service.files().get(fileId=instance['parents'][0]).execute()['name']
+        else:
+           return "Root"
+
+        
     async def createMetaData_File(self, fileName: str, interaction: discord.Interaction, folderName: Optional[str] = None):
         if folderName is None:
             return {
@@ -164,10 +180,21 @@ class AddDocument(commands.Cog):
                 'parents': [await self.getId(folderName, interaction, isFile=False)],
                 'mimeType': 'application/vnd.google-apps.document'
             }
+            
+    async def createMedaData_Folder(self, folderName: str, interaction: discord.Interaction, parentFolderN: Optional[str] = None):
+        if parentFolderN is None:
+            return {
+                'name': folderName,
+                'mimeType': 'application/vnd.google-apps.folder',
+            }
+        else:
+            return {
+                'name': folderName,
+                'parents': [await self.getId(parentFolderN, interaction, isFile=False)],  
+                'mimeType': 'application/vnd.google-apps.folder',
+            }
     
-    @app_commands.command(name="createfile", description="create a file")
-    async def fileCreate(self, interaction: discord.Interaction, file_name: str, folder_id: Optional[str] = None):
-        await interaction.response.defer(ephemeral=True)
+    async def getDriveService(self, interaction: discord.Interaction):
         creds = await self.getCred(interaction)
     
         if creds is None:
@@ -176,10 +203,18 @@ class AddDocument(commands.Cog):
                 ephemeral=True
             )
             
+            return None
+        
+        return build('drive', 'v3', credentials=creds)
+    
+    @app_commands.command(name="createfile", description="create a file")
+    async def fileCreate(self, interaction: discord.Interaction, file_name: str, folder_name: Optional[str] = None):
+        await interaction.response.defer(ephemeral=True)
+        drive_service = await self.getDriveService(interaction)
+        if drive_service is None:
             return
-            
-        drive_service = build('drive', 'v3', credentials=creds)
-        metaData = await self.createMetaData_File(file_name, interaction, folder_id)
+
+        metaData = await self.createMetaData_File(file_name, interaction, folder_name)
         doc = drive_service.files().create(body=metaData).execute()
 
         info = {
@@ -200,17 +235,11 @@ class AddDocument(commands.Cog):
     @app_commands.command(name="deletefile", description="delete a file")
     async def fileDelete(self, interaction: discord.Interaction, file_name: str):
         await interaction.response.defer(ephemeral=True)
-        creds = await self.getCred(interaction)
-    
-        if creds is None:
-            await interaction.followup.send(
-                f"Hi, {interaction.user.mention}, please make sure your email address has a valid authorization",
-                ephemeral=True
-            )
-            
-            return
+        drive_service = await self.getDriveService(interaction)
         
-        drive_service = build('drive', 'v3', credentials=creds)
+        if drive_service is None:
+            return
+
         theId = await self.getId(file_name, interaction, isFile=True)
         
         if theId is None:
@@ -248,19 +277,63 @@ class AddDocument(commands.Cog):
         
         embed = discord.Embed(title="Display Pages", description="Here are all the folders and files that are created through discord command")
         for file in fileL:
-            embed.add_field(name=f"File \t", value=f"{file['name']}", inline=True)   
+            embed.add_field(name=f"File \t", value=f"{file['name']} is in \t {await self.getParentFolderN(file['name'], interaction, True)}", inline=True)   
         for folder in folderL: 
-            embed.add_field(name=f"Folder \t", value=f"{folder['name']}", inline=True)   
+            embed.add_field(name=f"Folder \t", value=f"{folder['name']} is in \t {await self.getParentFolderN(file['name'], interaction, False)}", inline=True)   
 
         await interaction.followup.send(embed=embed, ephemeral=True)
             
     @app_commands.command(name="createfolder", description="create a folder")
-    async def folderCreate(self, interaction: discord.Interaction):
-        return
+    async def folderCreate(self, interaction: discord.Interaction, folder_name: str, parent_folder_name: Optional[str] = None):
+        await interaction.response.defer(ephemeral=True)
+        drive_service = await self.getDriveService(interaction)
+        
+        if drive_service is None:
+            return
+
+        metaData = await self.createMedaData_Folder(folder_name, interaction, parent_folder_name)
+        folder = drive_service.files().create(body=metaData).execute()
+        info = {
+            'isFile': False,
+            'dcUserId': interaction.user.id,
+            'emailAdress': self.getEmail(interaction),
+            'name': folder_name,
+            'id': folder['id']
+        }
+        
+        idInfo.insert_one(info)
+
+        await interaction.followup.send(
+                f"Hi, {interaction.user.mention}, folder is created!",
+                ephemeral=True
+            )
 
     @app_commands.command(name="deletefolder", description="delete a folder")
-    async def folderDelete(self, interaction: discord.Interaction):
-        return
+    async def folderDelete(self, interaction: discord.Interaction, folder_name: str):
+        await interaction.response.defer(ephemeral=True)
+        drive_service = await self.getDriveService(interaction)
+        
+        if drive_service is None:
+            return
+
+        theId = await self.getId(folder_name, interaction, isFile=False)
+        
+        if theId is None:
+            return
+
+        drive_service.files().delete(fileId=theId).execute()
+       
+        idInfo.delete_one({
+            'dcUserId': interaction.user.id, 
+            'id': theId,
+            'name': folder_name,
+            'isFile': False
+        })
+
+        await interaction.followup.send(
+            f"Hi, {interaction.user.mention}, folder is deleted",
+            ephemeral=True
+        )
     
 async def setup(bot):
     await bot.add_cog(AddDocument(bot))

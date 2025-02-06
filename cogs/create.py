@@ -143,6 +143,7 @@ class AddDocument(commands.Cog):
         )
         
         if idInfos is None:
+            print(f"-------------------------{name}{isFile}")
             await interaction.followup.send(
                 f"cannot find your file/directory in our database",
                 ephemeral=True
@@ -156,16 +157,17 @@ class AddDocument(commands.Cog):
         drive_service = await self.getDriveService(interaction)
         if drive_service is None:
             return 'n/a'
-        
+
         instance = drive_service.files().get(
-            fileId=self.getId(name, interaction, isFile),
+            fileId= await self.getId(name, interaction, isFile),
             fields='parents'
         ).execute()
-        
+
         if 'parents' in instance:
-            return drive_service.files().get(fileId=instance['parents'][0]).execute()['name']
+            parent = drive_service.files().get(fileId=instance['parents'][0]).execute()
+            return parent['name']
         else:
-           return "Root"
+            return "Root"
 
         
     async def createMetaData_File(self, fileName: str, interaction: discord.Interaction, folderName: Optional[str] = None):
@@ -276,10 +278,11 @@ class AddDocument(commands.Cog):
         }))
         
         embed = discord.Embed(title="Display Pages", description="Here are all the folders and files that are created through discord command")
+
         for file in fileL:
             embed.add_field(name=f"File \t", value=f"{file['name']} is in \t {await self.getParentFolderN(file['name'], interaction, True)}", inline=True)   
         for folder in folderL: 
-            embed.add_field(name=f"Folder \t", value=f"{folder['name']} is in \t {await self.getParentFolderN(file['name'], interaction, False)}", inline=True)   
+            embed.add_field(name=f"Folder \t", value=f"{folder['name']} is in \t {await self.getParentFolderN(folder['name'], interaction, False)}", inline=True)   
 
         await interaction.followup.send(embed=embed, ephemeral=True)
             

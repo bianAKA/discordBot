@@ -51,6 +51,9 @@ class AddDocument(commands.Cog):
             {"emailAdress": 1}
         )
         
+        if token is None:
+            return None
+        
         return token["emailAdress"]
 
     async def getCred(self, interaction: discord.Interaction):
@@ -143,7 +146,6 @@ class AddDocument(commands.Cog):
         )
         
         if idInfos is None:
-            print(f"-------------------------{name}{isFile}")
             await interaction.followup.send(
                 f"cannot find your file/directory in our database",
                 ephemeral=True
@@ -169,7 +171,6 @@ class AddDocument(commands.Cog):
         else:
             return "Root"
 
-        
     async def createMetaData_File(self, fileName: str, interaction: discord.Interaction, folderName: Optional[str] = None):
         if folderName is None:
             return {
@@ -208,6 +209,19 @@ class AddDocument(commands.Cog):
             return None
         
         return build('drive', 'v3', credentials=creds)
+    
+    async def getDocService(self, interaction: discord.Interaction):
+        creds = await self.getCred(interaction)
+        
+        if creds is None:
+            await interaction.followup.send(
+                f"Hi, {interaction.user.mention}, please make sure your email address has a valid authorization",
+                ephemeral=True
+            )
+            
+            return None
+
+        return build('docs', 'v1', credentials=creds)
     
     @app_commands.command(name="createfile", description="create a file")
     async def fileCreate(self, interaction: discord.Interaction, file_name: str, folder_name: Optional[str] = None):
@@ -264,26 +278,36 @@ class AddDocument(commands.Cog):
     @app_commands.command(name="display", description="know all your files and folders")
     async def display(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
+
+        emailAdress = self.getEmail(interaction)
         
+        if emailAdress is None:
+            interaction.followup.send(
+                f"Might need to use /activate command to activate your emailaddress",
+                ephemeral=True
+            )
+            
+            return
+
         fileL = list(idInfo.find({
             'dcUserId': interaction.user.id, 
             'isFile': True,
-            'emailAdress': self.getEmail(interaction)
+            'emailAdress': emailAdress
         }))
         
         folderL = list(idInfo.find({
             'dcUserId': interaction.user.id, 
             'isFile': False,
-            'emailAdress': self.getEmail(interaction)
+            'emailAdress': emailAdress
         }))
         
         embed = discord.Embed(title="Display Pages", description="Here are all the folders and files that are created through discord command")
-
+    
         for file in fileL:
             embed.add_field(name=f"File \t", value=f"{file['name']} is in \t {await self.getParentFolderN(file['name'], interaction, True)}", inline=True)   
         for folder in folderL: 
             embed.add_field(name=f"Folder \t", value=f"{folder['name']} is in \t {await self.getParentFolderN(folder['name'], interaction, False)}", inline=True)   
-
+   
         await interaction.followup.send(embed=embed, ephemeral=True)
             
     @app_commands.command(name="createfolder", description="create a folder")
@@ -338,5 +362,43 @@ class AddDocument(commands.Cog):
             ephemeral=True
         )
     
+    @app_commands.command(name="write", description="write something down")
+    async def writing(self, interaction: discord.Interaction, context: str, file_name: str):
+        await interaction.response.defer(ephemeral=True)
+        doc_service = await self.getDocService(interaction)
+        
+        if doc_service is None:
+            return
+
+        docId = self.getId(file_name, interaction, True)
+        if docId is None:
+            return
+        
+        docEntity = doc_service.documents().get(documentId=docId).execute()
+        endIndex = docEntity['body']['content'][-1]['endIndex']
+        
+        if endIndex == 1:   # empty document
+            pass
+        else:
+            endIndex -= 1
+        
+        requests = [
+            {
+                'insertText': {
+                    'location': {
+                        'index': endIndex
+                    },
+                    'text': context
+                }
+            }
+        ]
+
+        docs_service.documents().batchUpdate(documentId=docId, body={'requests': requests}).execute()
+
+        await interaction.followup.send(
+                f"Hi, {interaction.user.mention}, it is written now!",
+                ephemeral=True
+            )
+        
 async def setup(bot):
     await bot.add_cog(AddDocument(bot))

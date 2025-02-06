@@ -370,31 +370,26 @@ class AddDocument(commands.Cog):
         if doc_service is None:
             return
 
-        docId = self.getId(file_name, interaction, True)
+        docId = await self.getId(file_name, interaction, True)
         if docId is None:
             return
         
         docEntity = doc_service.documents().get(documentId=docId).execute()
         endIndex = docEntity['body']['content'][-1]['endIndex']
         
-        if endIndex == 1:   # empty document
-            pass
-        else:
-            endIndex -= 1
-        
         requests = [
             {
                 'insertText': {
                     'location': {
-                        'index': endIndex
+                        'index': endIndex - 1
                     },
                     'text': context
                 }
             }
         ]
-
-        docs_service.documents().batchUpdate(documentId=docId, body={'requests': requests}).execute()
-
+      
+        doc_service.documents().batchUpdate(documentId=docId, body={'requests': requests}).execute()
+ 
         await interaction.followup.send(
                 f"Hi, {interaction.user.mention}, it is written now!",
                 ephemeral=True
